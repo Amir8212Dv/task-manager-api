@@ -4,7 +4,7 @@ const multer = require('multer')
 const gm = require('gm')
 const { User } = require("../models/user");
 const auth = require("../middleware/auth");
-const { sendWelcomeEmail , sendGoodbyeEmail } = require('../email/account')
+// const { sendWelcomeEmail , sendGoodbyeEmail } = require('../email/account')
 const router = new express.Router();
 
 // -----------------------------------------------------------------
@@ -15,7 +15,9 @@ router.post("/users/signup", async (req, res) => {
     const user = await new User(bodyData);
     await user.save();
     const token = await user.generateAuthCode();
-    sendWelcomeEmail(user.email , user.name)
+    try {
+      // sendWelcomeEmail(user.email , user.name)
+    } catch {}
     res.status(201).send(user.publicProfile(token));
 
   } catch (error) {
@@ -30,7 +32,7 @@ router.post("/users/login", async (req, res) => {
     const token = await user.generateAuthCode();
     res.status(200).send(user.publicProfile(token));
   } catch {
-    res.status(400).send({ error: "Unable to login." });
+    res.status(400).send({ error: "Unable to login."});
   }
 });
 // -----------------------------------------------------------------
@@ -45,6 +47,19 @@ router.post("/users/logout", auth, async (req, res) => {
   }
 });
 // -----------------------------------------------------------------
+
+router.post("/users/logoutAll", auth, async (req, res) => {
+  try {
+    req.user.tokens = [];
+    await req.user.save();
+    res.status(200).send("you logged out from all devises");
+  } catch {
+    res.status(400).send({ error: "something went wrong!" });
+  }
+});
+
+  // -----------------------------------------------------------------
+
 const upload = multer({
   limits : {
     fileSize : 1000000
@@ -58,25 +73,14 @@ const upload = multer({
 })
                                       // use multer as a middleware
 router.post('/users/me/avatar' , auth , upload.single('avatar') , async (req , res) => {
-  const buffer = gm(req.file.buffer).resize({width : 250 , height : 250}).setFormat('png').toBuffer()
-  // using sharp to resize and convert images to 'png' files
-  // const buffer = sharp(req.file.buffer).resize({width : 250 , height : 250}).png().toBuffer()
-  req.user.avatar = buffer
+  const buffer = gm(req.file.buffer).setFormat('png')
+  req.user.avatar = buffer.sourceBuffer
   await req.user.save()
-  res.send()
+  res.status(200).send()
 } , 
+
 (error , req , res , next) => res.status(400).send({error : error.message}))
 
-// -----------------------------------------------------------------
-router.post("/users/logoutAll", auth, async (req, res) => {
-  try {
-    req.user.tokens = [];
-    await req.user.save();
-    res.status(200).send("you logged out from all devises");
-  } catch {
-    res.status(400).send({ error: "something went wrong!" });
-  }
-});
 
 router.get("/users/me", auth, (req, res) => {
   res.status(200).send(req.user.publicProfile(req.token));
@@ -99,7 +103,7 @@ router.patch("/users/me", auth, async (req, res) => {
   });
   // -----------------------------------------------------------------
   
-  router.get('/users/me/avatar' , async (req , res) => {
+  router.get('/users/me/avatar' , auth , async (req , res) => {
     try {
       if (!req.user.avatar) {
         throw new Error()
@@ -115,7 +119,9 @@ router.patch("/users/me", auth, async (req, res) => {
   router.delete("/users/me", auth, async (req, res) => {
     try {
       await req.user.remove()
-      sendGoodbyeEmail(req.user.email , req.user.name)
+      try {
+        sendGoodbyeEmail(req.user.email , req.user.name)
+      } catch {}
       res.status(200).send('removed successfully')
   } catch (error) {
     res.status(400).send({error})

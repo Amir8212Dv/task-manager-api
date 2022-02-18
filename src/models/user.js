@@ -83,9 +83,9 @@ schema.methods.publicProfile = function (token)  {
 schema.statics.findByCredential = async (email , password ) => {
     const user = await User.findOne({email})
     const passwordCheck = await bcrypt.compare(password , user.password)
-    
     if (!user || !passwordCheck) throw new Error()
     return user
+    
 }
 
 // Delete users tasks when user deleted , with mongoose *middleware*
